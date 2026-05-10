@@ -46,7 +46,6 @@ export interface ChapterContentRequest {
 
 export interface WordExportRequest {
   project_name?: string;
-  project_overview?: string;
   outline: OutlineItem[];
 }
 

@@ -350,7 +350,6 @@ const ContentEdit: React.FC<ContentEditProps> = ({
 
       const exportPayload = {
         project_name: outlineData.project_name,
-        project_overview: outlineData.project_overview,
         outline: buildExportOutline(outlineData.outline),
       };
 
