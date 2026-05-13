@@ -526,7 +526,7 @@ function SettingsPage() {
             <label className="settings-row">
               <div className="settings-row-copy">
                 <strong>开发者模式</strong>
-                <span>启用后保存每次 AI 请求和响应的完整日志，便于排查模型输出问题</span>
+                <span>会打乱既有工作流，生成大量日志占用磁盘空间，<strong>非专业人士请勿开启</strong></span>
               </div>
               <span className="settings-switch-control">
                 <input

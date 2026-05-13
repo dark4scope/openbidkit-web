@@ -120,6 +120,34 @@
 | Release 说明只有 `Full Changelog` | 首次 `v2.0.1` 远程发布验证 | 改为 workflow 用 `git log` 生成提交列表，并在 Release 已存在时用 `gh release edit --notes-file` 更新说明 |
 | Actions `Build renderer` 报 `TS2688: Cannot find type definition file for 'plist'` | 修复后手动重跑 `v2.0.1` | 显式安装 `@types/plist`，并在 workflow 中补 `npm install --no-save @types/plist` 兼容旧 tag |
 
+## Current Task: 知识库完整分析流程重构
+
+### Goal
+按讨论定版方案重构知识库上传分析：程序预筛并保留 `filtered_blocks.json`，将正文切为 block，AI 两轮抽取知识条目，调试页设置每批匹配条目数，分批用稳定前缀提交全文 block 匹配段落范围，补漏最多两轮，程序回填正文生成最终知识条目、舍弃段落和处理报告。
+
+### Phases
+- [completed] 1. 梳理现有知识库 Electron 服务、IPC、前端页面、数据落盘格式和 AI 工具。
+- [completed] 2. 设计并实现 block 预处理、筛除日志、条目抽取、补充抽取、分批匹配、补漏和最终回填流程。
+- [completed] 3. 扩展 IPC/preload/type，使上传后进入可调试的“待匹配”状态，并支持按用户输入批量继续分析。
+- [completed] 4. 重做知识库前端调试页面和详情页面，展示 block/条目/覆盖率/舍弃统计，并触发分批匹配。
+- [completed] 5. 补齐进度事件、错误提示、数据兼容处理和处理报告落盘。
+- [completed] 6. 运行 CJS 模块检查、关键纯函数 smoke test 和 `npm run build` 验证。
+
+### Decisions
+- 不做最小可执行版本，直接实现完整流程。
+- 程序直接筛除明显无价值内容，但保存 `filtered_blocks.json` 调试日志。
+- AI 不输出正文，只输出条目标题摘要、匹配段落范围、补漏新增条目和舍弃段落。
+- 条目 ID 由程序统一生成，AI 只返回标题和摘要。
+- 分批匹配提示词采用稳定前缀：固定规则 + 固定全文 block 在前，变量知识条目批次在最后，以利用服务商 prompt cache。
+- 分批匹配只要求强相关，不强制覆盖；补漏阶段再要求所有遗漏 block 明确归属为已有条目、新增条目或舍弃。
+- 不做冲突检查，先观察实际效果。
+
+### Errors Encountered
+| Error | Attempt | Resolution |
+| --- | --- | --- |
+| planning skill 示例路径 `~/.opencode/.../session-catchup.py` 不存在 | 第一次 catchup | 改用实际路径 `~/.config/opencode/.../session-catchup.py` |
+| `git diff --check` 报 `client/doc/知识库设计.md:63: new blank line at EOF` | 收尾检查 | 该文件非本次修改，按工作区保护规则未改动；本次修改文件仅有 LF/CRLF 提示 |
+
 ## Current Task: GitHub Release 自动打包与客户端更新检查
 
 ### Goal

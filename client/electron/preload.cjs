@@ -52,9 +52,14 @@ const bridge = {
   knowledgeBase: {
     list: () => ipcRenderer.invoke('knowledge-base:list'),
     createFolder: (name) => ipcRenderer.invoke('knowledge-base:create-folder', name),
+    renameFolder: (folderId, name) => ipcRenderer.invoke('knowledge-base:rename-folder', folderId, name),
+    deleteFolder: (folderId) => ipcRenderer.invoke('knowledge-base:delete-folder', folderId),
+    deleteDocument: (documentId) => ipcRenderer.invoke('knowledge-base:delete-document', documentId),
     uploadDocuments: (folderId) => ipcRenderer.invoke('knowledge-base:upload-documents', folderId),
+    startMatching: (documentId, batchSize) => ipcRenderer.invoke('knowledge-base:start-matching', documentId, batchSize),
     readMarkdown: (documentId) => ipcRenderer.invoke('knowledge-base:read-markdown', documentId),
     readItems: (documentId) => ipcRenderer.invoke('knowledge-base:read-items', documentId),
+    readAnalysis: (documentId) => ipcRenderer.invoke('knowledge-base:read-analysis', documentId),
     onEvent: (callback) => {
       const listener = (_event, payload) => callback(payload);
       ipcRenderer.on('knowledge-base:event', listener);

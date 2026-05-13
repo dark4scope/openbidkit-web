@@ -20,7 +20,7 @@ function registerIpcHandlers({ app, mainWindow, triggerUpdateDownload, quitAndIn
   const aiService = createAiService({ app, configStore });
   const fileService = createFileService({ configStore });
   const exportService = createExportService();
-  const knowledgeBaseService = createKnowledgeBaseService({ app, aiService });
+  const knowledgeBaseService = createKnowledgeBaseService({ app, aiService, configStore });
   const workspaceStore = createWorkspaceStore(app);
   const taskService = createTaskService({ aiService, workspaceStore });
 

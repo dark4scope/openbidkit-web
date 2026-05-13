@@ -44,3 +44,9 @@
 - 已完成 Step04 单章重新生成流程调整：新增 `contentGenerationPlans` 持久化最终编排/配图决策；全文生成后保存每个小节 `ai`/`mermaid`/`none`；单章重新生成优先复用历史编排并跳过编排模型，缺失时只编排目标小节一次，然后重新生成正文并按编排结果重新配图。单章复用与缺失两条 smoke test、正文任务模块加载、`npm run build`、`git diff --check` 通过；`git diff --check` 仍只有 LF/CRLF 提示。
 - 已修复 Step04 Word 导出 HTML 容器 P2：`div/section/article` 包含表格、列表、引用、图片等块级子节点时递归导出为 Word 原生结构；纯内联容器仍保持单段落输出；`p` 中出现块级子节点也拆块处理。HTML wrapper smoke test 通过：包裹表格生成 2 个 Word 表格，包裹列表保留 2 个列表项；`exportService` 模块加载、`npm run build`、`git diff --check` 通过，仍只有 LF/CRLF 提示。
 - 已修复 Step04 Word 导出列表项内表格问题：Markdown 表格归一化现在会保留空白前缀缩进，并让压缩表格拆出的行继承表头缩进，避免列表内 GFM 表格被破坏。列表项内表格 smoke test 通过：生成 1 个 Word 表格、外围列表保留 2 个列表项，且不残留 `| 备件类别` 或 `:---` 文本；`exportService` 模块加载、`npm run build`、`git diff --check` 通过，仍只有 LF/CRLF 提示。
+- 开始知识库完整分析流程重构：已根据用户确认记录完整方案、关键取舍和提示词缓存策略；下一步梳理现有知识库服务、IPC、类型和页面。
+- 已梳理现有知识库 Main 服务和 IPC：当前上传后立即 AI 整理并生成 `items.json`，前端没有继续分析入口；需要改为先生成候选条目和 block，再由用户输入批次大小启动匹配。
+- 已完成知识库完整流程重构：上传后准备 Markdown、block、筛除日志和两轮候选条目；新增 `startMatching/readAnalysis` IPC/preload/type；前端新增分析调试页和批次输入；匹配阶段按固定全文前缀 + 变量条目批次调用 AI，随后补漏最多两轮并由程序回填正文。
+- 验证通过：`node --check electron/services/knowledgeBaseService.cjs`、`node --check electron/ipc/knowledgeBaseIpc.cjs`、`node --check electron/preload.cjs`、知识库 block/filter/prompt smoke test、两次 `npm run build`。`git diff --check` 仅发现非本次修改的 `client/doc/知识库设计.md` EOF 空行和 LF/CRLF 提示。
+- 已按反馈优化知识库提示词缓存结构：移除知识库主流程所有 `system` prompt，改为多条 `user` 消息；全文 block 单独作为第一条 user message，任务要求和变量条目放后续 user message。已显式兼容第二轮补充条目返回 `{"items":[]}`，会继续合并首轮条目并进入待匹配。`node --check`、prompt smoke test、`npm run build` 通过。
+- 已为知识库流程增加开发者模式详细 JSONL 日志：写入 `userData/logs/knowledge-base/<documentId>.jsonl`，记录文档状态更新、复制/转换、block 筛选统计、每次 AI 调用开始/结束、prompt 消息长度、条目/匹配/补漏数量、保存路径和异常堆栈；分析调试页会展示日志路径。`node --check`、prompt smoke test、`npm run build` 通过。

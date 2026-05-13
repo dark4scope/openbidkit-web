@@ -49,3 +49,17 @@
 - 单章重新生成复用历史编排时仍能完整走“正文生成 -> 配图”流程；缺失历史编排时只编排目标小节一次，不触发全文 `planAll()`。
 - Word 导出 HTML 容器评审有效：`htmlNodeToDocxBlocks()` 原先把 `div/section/article` 统一走 `htmlInlineRuns()`，会让容器内的 `table/ul/ol/blockquote/img` 等块级内容丢失 Word 原生结构。修复后仅当容器存在块级子节点时递归到 `htmlNodesToDocxBlocks()`，纯内联容器仍保持单段落输出。
 - 列表项内 Markdown 表格导出失败的根因是导出前表格归一化丢掉了分隔行缩进：`    | :--- | ... |` 被拆成 `| :--- | ... |`，导致表头/分隔行/数据行缩进不一致，`remark-gfm` 不能把它识别成嵌套表格。保留空白前缀缩进后，列表内表格可以导出为 Word 原生表格。
+
+## Knowledge Base Redesign Findings
+- 用户确认知识库新流程：程序筛除无价值块并保留 `filtered_blocks.json`；筛后内容编号为 block；AI 先全文抽条目，再用全文 + 首轮条目做补充；程序合并并生成 ID；页面输入每批匹配条目数；分批提交固定全文 + 当前批次条目做强相关匹配；遗漏 block 走最多两轮补漏；最终程序回填正文。
+- 分批匹配请求需要缓存友好：固定提示词和全文 block 保持在请求前缀，变化的知识条目批次放最后，避免前缀变化破坏 AI 服务商 prompt cache。
+- 用户明确暂不做冲突检查；即使同一 block 被多个条目引用，也先观察实际效果再决定是否投入治理。
+- 现有 `knowledgeBaseService.cjs` 上传后立即后台处理文档：复制原文件、转换 Markdown、按 `B00001` 旧块切分、分 chunk 让 AI 直接输出 `items + source_block_ids`，随后程序回填正文写 `items.json`。需要替换为“准备分析 -> 用户输入每批条目数 -> 继续匹配”的两阶段流程。
+- 现有 IPC/preload 只有 `list/createFolder/uploadDocuments/readMarkdown/readItems/onEvent`，需要增加读取分析快照/报告和启动分批匹配的接口。
+- 现有前端共享类型只定义 `pending/copying/converting/analyzing/saving/success/error` 状态；新流程需要新增候选条目已生成但未匹配的状态，以及报告字段。
+- `aiService.collectJsonResponse()` 已提供 JSON 解析、修复和最多重试能力，知识库新流程应继续复用它；开发者模式下 AI 日志会保存完整请求，可用于验证稳定前缀和 prompt cache 结构。
+- `KnowledgeBasePage.tsx` 当前已经有内部“列表/条目详情/Markdown详情”状态切换，适合继续扩展出分析调试详情页，不必引入 URL 路由。
+- 已实现的新版知识库落盘文件包括：`content.md`、`blocks.json`、`filtered_blocks.json`、`candidate_items.json`、`match_result.json`、`report.json`、`items.json`。其中 `match_result.json` 保存批次匹配、补漏、新增条目、AI 舍弃和 `system_discarded_after_retry`。
+- 前端新增“分析调试”详情页：展示候选条目、有效/筛除 block、最终条目、覆盖率、补漏新增、舍弃记录，并允许输入每批条目数启动 `startMatching`。
+- 知识库 AI 请求已按缓存优化改为纯 `user` 多消息：全文 block 是第一条 user message，任务要求和当前批次变量放后续 user message；不再使用 system prompt，避免 system 内容破坏前缀缓存收益。
+- 开发者模式下知识库流程现在额外输出 JSONL 调试日志到 `logs/knowledge-base/<documentId>.jsonl`，用于定位“卡住”发生在 AI 调用前、AI 调用后、normalizer/validator、状态更新还是保存阶段。

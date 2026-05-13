@@ -7,7 +7,61 @@ export interface KnowledgeItem {
   source_file?: string;
 }
 
-export type KnowledgeDocumentStatus = 'pending' | 'copying' | 'converting' | 'analyzing' | 'saving' | 'success' | 'error';
+export interface KnowledgeCandidateItem {
+  id: string;
+  title: string;
+  summary: string;
+}
+
+export interface KnowledgeDiscardedBlockGroup {
+  block_ids: string[];
+  reason: string;
+  source?: string;
+}
+
+export interface KnowledgeAnalysisReport {
+  total_blocks: number;
+  filtered_blocks_count: number;
+  candidate_items_count: number;
+  final_items_count: number;
+  matched_blocks_count: number;
+  discarded_blocks_count: number;
+  system_discarded_after_retry_count: number;
+  new_items_from_recovery_count: number;
+  recovery_attempt_count: number;
+  batch_size: number;
+  coverage_rate: number;
+  matched_rate: number;
+  created_at: string;
+}
+
+export interface KnowledgeAnalysisSnapshot {
+  document: KnowledgeDocument;
+  block_count: number;
+  filtered_blocks_count: number;
+  markdown_chars: number;
+  kept_block_chars: number;
+  covered_unique_content_chars: number;
+  coverage_rate_vs_markdown: number;
+  candidate_items: KnowledgeCandidateItem[];
+  report: KnowledgeAnalysisReport | null;
+  discarded: KnowledgeDiscardedBlockGroup[];
+  system_discarded_after_retry: KnowledgeDiscardedBlockGroup[];
+  debug_log_path?: string;
+}
+
+export interface KnowledgeBaseStartMatchingResult {
+  success: boolean;
+  message: string;
+  document?: KnowledgeDocument;
+}
+
+export interface KnowledgeBaseMutationResult {
+  success: boolean;
+  message: string;
+}
+
+export type KnowledgeDocumentStatus = 'pending' | 'copying' | 'converting' | 'extracting' | 'ready_for_matching' | 'matching' | 'recovering' | 'analyzing' | 'saving' | 'success' | 'error';
 
 export interface KnowledgeFolder {
   id: string;
@@ -24,6 +78,12 @@ export interface KnowledgeDocument {
   progress: number;
   message: string;
   item_count: number;
+  block_count?: number;
+  filtered_block_count?: number;
+  candidate_item_count?: number;
+  discarded_block_count?: number;
+  system_discarded_after_retry_count?: number;
+  last_batch_size?: number;
   created_at: string;
   updated_at: string;
   error?: string;
