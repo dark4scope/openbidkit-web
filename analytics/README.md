@@ -169,6 +169,24 @@ Invoke-RestMethod `
 
 Analytics Engine 写入后可能需要等待几十秒才能查到。
 
+### 6. 查看 Worker 错误日志
+
+本地登录 Cloudflare 后，可实时查看 API Worker 日志：
+
+```powershell
+cd analytics\worker
+npx wrangler tail agnet-analytics-api --format pretty
+```
+
+如果尚未登录，先执行：
+
+```powershell
+cd analytics\worker
+npx wrangler login
+```
+
+查询接口失败时，Worker 会输出类似 `[analytics] summary query failed ...` 的错误日志。
+
 ## 三、接入新项目
 
 不需要修改 Worker 配置。任意合法 `projectName` 都可以直接上报和查询。

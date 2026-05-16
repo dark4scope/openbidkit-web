@@ -62,6 +62,37 @@ function safePage(value) {
   return Math.max(1, Math.floor(page));
 }
 
+function isoDateDaysAgo(days) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+function daysSinceIsoDate(value) {
+  const date = new Date(`${String(value || '').slice(0, 10)}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return NaN;
+
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.floor((todayUtc - date.getTime()) / 86400000);
+}
+
+function addIsoDays(value, days) {
+  const date = new Date(`${String(value || '').slice(0, 10)}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return '';
+
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function datePart(value) {
+  return String(value || '').slice(0, 10);
+}
+
+function logQueryError(scope, error) {
+  console.error(`[analytics] ${scope} query failed`, error?.message || String(error));
+}
+
 function sqlString(value) {
   return `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 }
@@ -218,7 +249,8 @@ async function handleProjects(request, env) {
       code: 0,
       projects: (result.data || []).map((item) => item.projectName).filter(Boolean),
     });
-  } catch {
+  } catch (error) {
+    logQueryError('projects', error);
     return json({ code: 500, message: 'query failed' }, { status: 500 });
   }
 }
@@ -279,44 +311,99 @@ async function handleSummary(request, env, url) {
     LIMIT 50
   `;
 
-  const clientsSql = `
+  const totalClientsSql = `
     SELECT
-      COUNT(DISTINCT blob7) AS totalClients,
-      COUNT(DISTINCT IF(toDate(timestamp) = toDate(NOW()), blob7, NULL)) AS todayActiveClients,
-      COUNT(DISTINCT IF(timestamp >= NOW() - INTERVAL '7' DAY, blob7, NULL)) AS wau,
-      COUNT(DISTINCT IF(timestamp >= NOW() - INTERVAL '30' DAY, blob7, NULL)) AS mau,
-      COUNT(DISTINCT IF(timestamp >= NOW() - INTERVAL '${days}' DAY, blob7, NULL)) AS activeClients,
-      COUNT(DISTINCT IF(timestamp >= NOW() - INTERVAL '${days}' DAY AND blob8 != '' AND toDateOrNull(blob8) >= toDate(NOW() - INTERVAL '${days}' DAY), blob7, NULL)) AS newClients
+      COUNT(DISTINCT blob7) AS totalClients
     FROM ${DATASET}
     WHERE blob1 = ${project}
       AND blob7 != ''
   `;
 
+  const todayActiveClientsSql = `
+    SELECT
+      COUNT(DISTINCT blob7) AS todayActiveClients
+    FROM ${DATASET}
+    WHERE blob1 = ${project}
+      AND blob7 != ''
+      AND toDate(timestamp) = toDate(NOW())
+  `;
+
+  const wauSql = `
+    SELECT
+      COUNT(DISTINCT blob7) AS wau
+    FROM ${DATASET}
+    WHERE blob1 = ${project}
+      AND blob7 != ''
+      AND timestamp >= NOW() - INTERVAL '7' DAY
+  `;
+
+  const mauSql = `
+    SELECT
+      COUNT(DISTINCT blob7) AS mau
+    FROM ${DATASET}
+    WHERE blob1 = ${project}
+      AND blob7 != ''
+      AND timestamp >= NOW() - INTERVAL '30' DAY
+  `;
+
+  const activeClientsSql = `
+    SELECT
+      COUNT(DISTINCT blob7) AS activeClients
+    FROM ${DATASET}
+    WHERE blob1 = ${project}
+      AND blob7 != ''
+      AND timestamp >= NOW() - INTERVAL '${days}' DAY
+  `;
+
+  const newClientsSql = `
+    SELECT
+      COUNT(DISTINCT blob7) AS newClients
+    FROM ${DATASET}
+    WHERE blob1 = ${project}
+      AND blob7 != ''
+      AND blob8 != ''
+      AND blob8 >= ${sqlString(isoDateDaysAgo(days))}
+      AND timestamp >= NOW() - INTERVAL '${days}' DAY
+  `;
+
   try {
-    const [daily, pages, versions, clients] = await Promise.all([
+    const [daily, pages, versions, totalClients, todayActiveClients, wau, mau, activeClients, newClients] = await Promise.all([
       queryAnalytics(env, dailySql),
       queryAnalytics(env, pagesSql),
       queryAnalytics(env, versionsSql),
-      queryAnalytics(env, clientsSql),
+      queryAnalytics(env, totalClientsSql),
+      queryAnalytics(env, todayActiveClientsSql),
+      queryAnalytics(env, wauSql),
+      queryAnalytics(env, mauSql),
+      queryAnalytics(env, activeClientsSql),
+      queryAnalytics(env, newClientsSql),
     ]);
-    const clientStats = clients.data?.[0] || {};
+    const clientStats = {
+      totalClients: Number(totalClients.data?.[0]?.totalClients || 0),
+      todayActiveClients: Number(todayActiveClients.data?.[0]?.todayActiveClients || 0),
+      wau: Number(wau.data?.[0]?.wau || 0),
+      mau: Number(mau.data?.[0]?.mau || 0),
+      activeClients: Number(activeClients.data?.[0]?.activeClients || 0),
+      newClients: Number(newClients.data?.[0]?.newClients || 0),
+    };
 
     return json({
       code: 0,
       projectName,
       days,
-      totalClients: Number(clientStats.totalClients || 0),
-      todayActiveClients: Number(clientStats.todayActiveClients || 0),
-      wau: Number(clientStats.wau || 0),
-      mau: Number(clientStats.mau || 0),
-      activeClients: Number(clientStats.activeClients || 0),
-      newClients: Number(clientStats.newClients || 0),
-      returningClients: Math.max(0, Number(clientStats.activeClients || 0) - Number(clientStats.newClients || 0)),
+      totalClients: clientStats.totalClients,
+      todayActiveClients: clientStats.todayActiveClients,
+      wau: clientStats.wau,
+      mau: clientStats.mau,
+      activeClients: clientStats.activeClients,
+      newClients: clientStats.newClients,
+      returningClients: Math.max(0, clientStats.activeClients - clientStats.newClients),
       daily: daily.data || [],
       pages: pages.data || [],
       versions: versions.data || [],
     });
-  } catch {
+  } catch (error) {
+    logQueryError('summary', error);
     return json({ code: 500, message: 'query failed' }, { status: 500 });
   }
 }
@@ -377,7 +464,8 @@ async function handleLatest(request, env, url) {
       total: Number(total.data?.[0]?.total || 0),
       events: latest.data || [],
     });
-  } catch {
+  } catch (error) {
+    logQueryError('latest', error);
     return json({ code: 500, message: 'query failed' }, { status: 500 });
   }
 }
@@ -401,27 +489,55 @@ async function handleRetention(request, env, url) {
   const project = sqlString(projectName);
   const sql = `
     SELECT
-      COUNT(DISTINCT IF(dateDiff('day', toDateOrNull(blob8), toDate(NOW())) BETWEEN 1 AND ${days}, blob7, NULL)) AS d1CohortClients,
-      COUNT(DISTINCT IF(dateDiff('day', toDateOrNull(blob8), toDate(NOW())) BETWEEN 1 AND ${days} AND dateDiff('day', toDateOrNull(blob8), toDate(timestamp)) = 1, blob7, NULL)) AS d1RetainedClients,
-      COUNT(DISTINCT IF(dateDiff('day', toDateOrNull(blob8), toDate(NOW())) BETWEEN 3 AND ${days}, blob7, NULL)) AS d3CohortClients,
-      COUNT(DISTINCT IF(dateDiff('day', toDateOrNull(blob8), toDate(NOW())) BETWEEN 3 AND ${days} AND dateDiff('day', toDateOrNull(blob8), toDate(timestamp)) = 3, blob7, NULL)) AS d3RetainedClients,
-      COUNT(DISTINCT IF(dateDiff('day', toDateOrNull(blob8), toDate(NOW())) BETWEEN 7 AND ${days}, blob7, NULL)) AS d7CohortClients,
-      COUNT(DISTINCT IF(dateDiff('day', toDateOrNull(blob8), toDate(NOW())) BETWEEN 7 AND ${days} AND dateDiff('day', toDateOrNull(blob8), toDate(timestamp)) = 7, blob7, NULL)) AS d7RetainedClients
+      timestamp,
+      blob7 AS clientId,
+      blob8 AS clientCreatedAt
     FROM ${DATASET}
     WHERE blob1 = ${project}
       AND blob2 = 'app_open'
       AND blob7 != ''
       AND blob8 != ''
+      AND blob8 >= ${sqlString(isoDateDaysAgo(days))}
+    ORDER BY timestamp ASC
+    LIMIT 50000
   `;
 
   try {
     const result = await queryAnalytics(env, sql);
-    const stats = result.data?.[0] || {};
-    const buildRow = (day, cohortKey, retainedKey) => {
-      const cohortClients = Number(stats[cohortKey] || 0);
-      const retainedClients = Number(stats[retainedKey] || 0);
+    const clients = new Map();
+
+    for (const row of result.data || []) {
+      const clientId = String(row.clientId || '');
+      const clientCreatedAt = datePart(row.clientCreatedAt);
+      const activeDate = datePart(row.timestamp);
+      const age = daysSinceIsoDate(clientCreatedAt);
+      if (!clientId || !clientCreatedAt || !activeDate || !Number.isFinite(age) || age < 0 || age > days) {
+        continue;
+      }
+
+      const client = clients.get(clientId) || { clientCreatedAt, activeDates: new Set() };
+      client.activeDates.add(activeDate);
+      clients.set(clientId, client);
+    }
+
+    const buildRow = (day) => {
+      let cohortClients = 0;
+      let retainedClients = 0;
+
+      for (const client of clients.values()) {
+        const age = daysSinceIsoDate(client.clientCreatedAt);
+        if (!Number.isFinite(age) || age < day || age > days) {
+          continue;
+        }
+
+        cohortClients += 1;
+        if (client.activeDates.has(addIsoDays(client.clientCreatedAt, day))) {
+          retainedClients += 1;
+        }
+      }
+
       return {
-        day,
+        day: `D${day}`,
         cohortClients,
         retainedClients,
         retentionRate: cohortClients > 0 ? retainedClients / cohortClients : 0,
@@ -433,12 +549,13 @@ async function handleRetention(request, env, url) {
       projectName,
       days,
       retention: [
-        buildRow('D1', 'd1CohortClients', 'd1RetainedClients'),
-        buildRow('D3', 'd3CohortClients', 'd3RetainedClients'),
-        buildRow('D7', 'd7CohortClients', 'd7RetainedClients'),
+        buildRow(1),
+        buildRow(3),
+        buildRow(7),
       ],
     });
-  } catch {
+  } catch (error) {
+    logQueryError('retention', error);
     return json({ code: 500, message: 'query failed' }, { status: 500 });
   }
 }
@@ -491,7 +608,8 @@ async function handleConfigUsage(request, env, url) {
       days,
       usage,
     });
-  } catch {
+  } catch (error) {
+    logQueryError('config-usage', error);
     return json({ code: 500, message: 'query failed' }, { status: 500 });
   }
 }
