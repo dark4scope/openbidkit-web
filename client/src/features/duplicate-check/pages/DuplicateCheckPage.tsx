@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FloatingToolbar, isLibreOfficeRequiredMessage, ToolbarArrowLeftIcon, ToolbarArrowRightIcon, useDocumentParseNotice, useToast } from '../../../shared/ui';
 import type { FloatingToolbarGroup } from '../../../shared/ui';
-import type { DuplicateAnalysisStatus, DuplicateAnalysisTabId, DuplicateCheckStep, DuplicateCheckWorkspaceState, DuplicateContentAnalysisState, DuplicateImageAnalysisState, DuplicateMetadataAnalysisState, DuplicateOutlineAnalysisState, DuplicateOutlineFileResult, DuplicateOutlineItem, LocalFileSelection } from '../../../shared/types';
+import type { DuplicateAnalysisStatus, DuplicateAnalysisTabId, DuplicateCheckStep, DuplicateCheckWorkspaceState, DuplicateContentAnalysisState, DuplicateImageAnalysisState, DuplicateMetadataAnalysisState, DuplicateOutlineAnalysisState, LocalFileSelection } from '../../../shared/types';
 
 const guideItems = [
   '同设备、同用户、同一个 WPS 账号、时间相近等问题，一秒锁定。',
@@ -87,6 +87,10 @@ function buildFileLabelMap(files: LocalFileSelection[]) {
 function formatDuplicateSentenceText(normalized: string, sentence: string) {
   const text = normalized || sentence;
   return text.length > 600 ? `${text.slice(0, 600)}...` : text;
+}
+
+function formatImageLocationSentence(value: string) {
+  return value.length > 72 ? `${value.slice(0, 72)}...` : value;
 }
 
 function createDuplicateCheckSignature(files: LocalFileSelection[]) {
@@ -256,115 +260,93 @@ function DuplicateMetadataPane({ analysis, bidFiles }: { analysis?: DuplicateMet
   );
 }
 
-function formatPercent(value: number) {
-  return `${Math.round(value * 100)}%`;
-}
-
-function sourceLabel(source?: string) {
-  if (source === 'catalog') return '目录页';
-  if (source === 'heading') return '标题样式';
-  if (source === 'semantic') return '语义标题';
-  return '未识别';
-}
-
-function buildOutlineChildren(items: DuplicateOutlineItem[]) {
-  const children = new Map<string, DuplicateOutlineItem[]>();
-  for (const item of items) {
-    const key = item.parent_id || 'root';
-    children.set(key, [...(children.get(key) || []), item]);
-  }
-  return children;
-}
-
-function DuplicateOutlineTree({ file }: { file?: DuplicateOutlineFileResult }) {
-  if (!file) {
-    return <div className="duplicate-analysis-empty"><strong>请选择投标文件</strong><p>左侧选择文件后查看多级目录树。</p></div>;
-  }
-  if (!file.items.length) {
-    return <div className="duplicate-analysis-empty"><strong>未识别到目录</strong><p>{file.error || '当前文件没有提取到可用目录结构。'}</p></div>;
-  }
-
-  const children = buildOutlineChildren(file.items);
-  const renderItems = (parentId = 'root') => (children.get(parentId) || []).map((item) => {
-    const duplicated = item.duplicate_group_ids.length > 0;
-    const similar = item.similar_group_ids.length > 0;
-    return (
-      <li key={item.id} className={`duplicate-outline-node${duplicated ? ' is-duplicate' : similar ? ' is-similar' : ''}${item.from_tender ? ' is-from-tender' : ''}`}>
-        <div className="duplicate-outline-node-main" title={item.matched_tender_sentence || item.path_titles.join(' > ')}>
-          <span className="duplicate-outline-node-title">{item.number ? `${item.number} ` : ''}{item.title}</span>
-          <span className="duplicate-outline-node-tags">
-            {duplicated && <em>重复</em>}
-            {!duplicated && similar && <em>相似</em>}
-            {item.from_tender && <em className="is-muted">来自招标文件</em>}
-            <em className="is-source">{sourceLabel(item.source)}</em>
-          </span>
-        </div>
-        {children.has(item.id) && <ol>{renderItems(item.id)}</ol>}
-      </li>
-    );
-  });
-
-  return <ol className="duplicate-outline-tree">{renderItems()}</ol>;
-}
-
 function DuplicateOutlinePane({ analysis, bidFiles }: { analysis?: DuplicateOutlineAnalysisState; bidFiles: LocalFileSelection[] }) {
+  const { showToast } = useToast();
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+  const labelMap = useMemo(() => buildFileLabelMap(bidFiles), [bidFiles]);
   const files = analysis?.files || [];
-  const [selectedFileId, setSelectedFileId] = useState<string>('');
-  const selectedFile = files.find((file) => file.file_id === selectedFileId) || files[0];
   const successfulFiles = files.filter((file) => file.status === 'success');
+  const duplicateGroups = analysis?.duplicateGroups || [];
+  const totalPages = Math.max(1, Math.ceil(duplicateGroups.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = duplicateGroups.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  useEffect(() => {
-    if (!selectedFileId && files[0]) setSelectedFileId(files[0].file_id);
-    if (selectedFileId && files.length && !files.some((file) => file.file_id === selectedFileId)) setSelectedFileId(files[0].file_id);
-  }, [files, selectedFileId]);
+  useEffect(() => setPage(1), [duplicateGroups.length]);
+
+  function getOutlineGroupText(group: DuplicateOutlineAnalysisState['duplicateGroups'][number]) {
+    const firstPath = group.file_ids.map((fileId) => group.paths[fileId]?.[0]).find(Boolean);
+    return group.type === 'duplicate' && firstPath ? firstPath : group.title || firstPath || '未识别目录';
+  }
+
+  async function handleCopyOutline(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('已复制重复目录', 'success');
+    } catch {
+      showToast('复制重复目录失败', 'error');
+    }
+  }
 
   if (!analysis) {
     return <div className="duplicate-analysis-empty"><strong>等待目录分析</strong><p>元数据提取完成后会自动开始目录分析。</p></div>;
   }
 
   return (
-    <div className="duplicate-outline-panel">
-      <div className="duplicate-outline-workbench">
-        <aside className="duplicate-outline-files">
-          <strong>投标文件目录</strong>
-          {files.length ? files.map((file) => (
-            <button type="button" key={file.file_id} className={file.file_id === selectedFile?.file_id ? 'is-active' : undefined} onClick={() => setSelectedFileId(file.file_id)}>
-              <span>{file.file_name}</span>
-              <small>{file.item_count} 项 · {sourceLabel(file.source)} · 招标命中 {file.tender_matched_count}</small>
-            </button>
-          )) : bidFiles.map((file) => <button type="button" key={file.id} disabled><span>{file.file_name}</span><small>等待提取</small></button>)}
-        </aside>
-
-        <section className="duplicate-outline-card duplicate-outline-tree-card">
-          <div className="duplicate-outline-card-head">
-            <strong>{selectedFile?.file_name || '目录树'}</strong>
-            {selectedFile && <span>{selectedFile.item_count} 项 · 置信度 {formatPercent(selectedFile.confidence || 0)}</span>}
+    <div className="duplicate-match-panel">
+      <DuplicateFileCodeBar files={bidFiles} />
+      {duplicateGroups.length ? (
+        <section className="duplicate-match-card">
+          <div className="duplicate-match-card-head">
+            <strong>重复目录</strong>
+            <span>{analysis.message} · 已排除招标目录 {analysis.tenderMatchedItemCount} 项</span>
           </div>
-          <DuplicateOutlineTree file={selectedFile} />
+          <div className="duplicate-sentence-list duplicate-outline-list">
+            {pageItems.map((group) => {
+              const text = getOutlineGroupText(group);
+              return (
+                <article key={group.id}>
+                  <div className="duplicate-sentence-content">
+                    <p>
+                      {text}
+                      <button
+                        type="button"
+                        className="duplicate-sentence-copy"
+                        onClick={() => void handleCopyOutline(text)}
+                        aria-label="复制重复目录"
+                      >
+                        复制
+                      </button>
+                    </p>
+                  </div>
+                  <div className="duplicate-file-badges">
+                    {group.file_ids.map((fileId) => {
+                      const count = group.paths[fileId]?.length || group.item_ids[fileId]?.length || 1;
+                      return (
+                        <span key={fileId} title={bidFiles.find((file) => file.id === fileId)?.file_name || fileId}>
+                          {labelMap.get(fileId) || '?'}{count > 1 ? ` x${count}` : ''}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <PaginationControls page={currentPage} pageSize={pageSize} total={duplicateGroups.length} onPageChange={setPage} />
         </section>
-
-        <aside className="duplicate-outline-groups">
-          <strong>重复组</strong>
-          {analysis.duplicateGroups.length ? analysis.duplicateGroups.slice(0, 80).map((group) => (
-            <article key={group.id} className={`is-${group.type}`}>
-              <div><span>{group.type === 'duplicate' ? '强重复' : '疑似相似'}</span><em>{formatPercent(group.score)}</em></div>
-              <strong>{group.title}</strong>
-              <small>涉及 {group.file_ids.length} 份文件</small>
-              {group.file_ids.map((fileId) => <p key={fileId}>{files.find((file) => file.file_id === fileId)?.file_name || fileId}：{(group.paths[fileId] || []).join('；')}</p>)}
-            </article>
-          )) : <p className="duplicate-outline-muted">暂无投标文件之间的目录重复项。</p>}
-        </aside>
-      </div>
-
-      {analysis.status === 'error' && <p className="duplicate-analysis-warning">部分文件目录提取失败，可重新查重或检查文档是否包含可选中文字。</p>}
-      {analysis.status === 'success' && successfulFiles.length > 0 && !analysis.duplicateGroups.length && (
-        <p className="duplicate-outline-muted">未发现投标文件之间的目录重复；来自招标文件的目录项已自动排除。</p>
+      ) : (
+        <div className="duplicate-analysis-empty">
+          <strong>{analysis.status === 'running' ? '正在分析目录' : '未发现重复目录'}</strong>
+          <p>{analysis.status === 'running' ? analysis.message : successfulFiles.length > 0 ? '未发现投标文件之间的目录重复；来自招标文件的目录项已自动排除。' : '暂无可用目录结果。'}</p>
+        </div>
       )}
     </div>
   );
 }
 
 function DuplicateContentPane({ analysis, bidFiles }: { analysis?: DuplicateContentAnalysisState; bidFiles: LocalFileSelection[] }) {
+  const { showToast } = useToast();
   const [page, setPage] = useState(1);
   const pageSize = 50;
   const labelMap = useMemo(() => buildFileLabelMap(bidFiles), [bidFiles]);
@@ -374,6 +356,15 @@ function DuplicateContentPane({ analysis, bidFiles }: { analysis?: DuplicateCont
   const pageItems = duplicateSentences.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   useEffect(() => setPage(1), [duplicateSentences.length]);
+
+  async function handleCopySentence(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('已复制重复句子', 'success');
+    } catch {
+      showToast('复制重复句子失败', 'error');
+    }
+  }
 
   if (!analysis) {
     return <div className="duplicate-analysis-empty"><strong>等待正文比对</strong><p>正文内容提取完成后会自动开始句子级比对。</p></div>;
@@ -391,7 +382,19 @@ function DuplicateContentPane({ analysis, bidFiles }: { analysis?: DuplicateCont
           <div className="duplicate-sentence-list">
             {pageItems.map((item) => (
               <article key={item.id}>
-                <p>{formatDuplicateSentenceText(item.normalized, item.sentence)}</p>
+                <div className="duplicate-sentence-content">
+                  <p>
+                    {formatDuplicateSentenceText(item.normalized, item.sentence)}
+                    <button
+                      type="button"
+                      className="duplicate-sentence-copy"
+                      onClick={() => void handleCopySentence(item.sentence || item.normalized)}
+                      aria-label="复制重复句子"
+                    >
+                      复制
+                    </button>
+                  </p>
+                </div>
                 <div className="duplicate-file-badges">
                   {item.file_ids.map((fileId) => (
                     <span key={fileId} title={bidFiles.find((file) => file.id === fileId)?.file_name || fileId}>
@@ -415,6 +418,7 @@ function DuplicateContentPane({ analysis, bidFiles }: { analysis?: DuplicateCont
 }
 
 function DuplicateImagePane({ analysis, bidFiles }: { analysis?: DuplicateImageAnalysisState; bidFiles: LocalFileSelection[] }) {
+  const { showToast } = useToast();
   const [page, setPage] = useState(1);
   const pageSize = 24;
   const labelMap = useMemo(() => buildFileLabelMap(bidFiles), [bidFiles]);
@@ -424,6 +428,15 @@ function DuplicateImagePane({ analysis, bidFiles }: { analysis?: DuplicateImageA
   const pageItems = duplicateImages.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   useEffect(() => setPage(1), [duplicateImages.length]);
+
+  async function handleCopyImageLocation(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('已复制定位线索', 'success');
+    } catch {
+      showToast('复制定位线索失败', 'error');
+    }
+  }
 
   if (!analysis) {
     return <div className="duplicate-analysis-empty"><strong>等待图片比对</strong><p>正文内容提取完成后会自动按图片 hash 比对。</p></div>;
@@ -439,21 +452,38 @@ function DuplicateImagePane({ analysis, bidFiles }: { analysis?: DuplicateImageA
             <span>{analysis.message} · 共识别 {analysis.totalImageCount} 张图片</span>
           </div>
           <div className="duplicate-image-grid">
-            {pageItems.map((item) => (
-              <article key={item.id}>
-                <div className="duplicate-image-preview">
-                  <img src={item.preview_url} alt={`重复图片 ${item.hash.slice(0, 10)}`} loading="lazy" />
-                </div>
-                <strong>Hash {item.hash.slice(0, 12)}</strong>
-                <div className="duplicate-file-badges">
-                  {item.file_ids.map((fileId) => (
-                    <span key={fileId} title={bidFiles.find((file) => file.id === fileId)?.file_name || fileId}>
-                      {labelMap.get(fileId) || '?'}{item.occurrences[fileId] > 1 ? ` x${item.occurrences[fileId]}` : ''}
-                    </span>
-                  ))}
-                </div>
-              </article>
-            ))}
+            {pageItems.map((item) => {
+              const locationEntries = item.file_ids.flatMap((fileId) => {
+                const location = item.locations?.[fileId]?.[0];
+                return location ? [{ fileId, location }] : [];
+              });
+              return (
+                <article key={item.id}>
+                  <div className="duplicate-image-preview">
+                    <img src={item.preview_url} alt={`重复图片 ${item.hash.slice(0, 10)}`} loading="lazy" />
+                  </div>
+                  <strong>Hash {item.hash.slice(0, 12)}</strong>
+                  <div className="duplicate-file-badges">
+                    {item.file_ids.map((fileId) => (
+                      <span key={fileId} title={bidFiles.find((file) => file.id === fileId)?.file_name || fileId}>
+                        {labelMap.get(fileId) || '?'}{item.occurrences[fileId] > 1 ? ` x${item.occurrences[fileId]}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                  {locationEntries.length > 0 && (
+                    <div className="duplicate-image-locations">
+                      {locationEntries.map((entry) => (
+                        <div key={entry.fileId} className="duplicate-image-location">
+                          <span>{labelMap.get(entry.fileId) || '?'}：{entry.location.directory || '未识别目录'}</span>
+                          <p title={entry.location.previous_sentence || undefined}>前文：{entry.location.previous_sentence ? formatImageLocationSentence(entry.location.previous_sentence) : '未提取到图片前文'}</p>
+                          <button type="button" onClick={() => void handleCopyImageLocation(entry.location.previous_sentence)} disabled={!entry.location.previous_sentence}>复制定位线索</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </div>
           <PaginationControls page={currentPage} pageSize={pageSize} total={duplicateImages.length} onPageChange={setPage} />
         </section>

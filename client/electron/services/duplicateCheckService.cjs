@@ -1542,17 +1542,78 @@ function buildDuplicateSentences(globalSentences) {
     .map((item, index) => ({ ...item, id: `S${String(index + 1).padStart(6, '0')}` }));
 }
 
-function extractImageTargets(markdown) {
+function extractLineImageTargets(line) {
   const targets = [];
-  for (const match of String(markdown || '').matchAll(markdownImagePattern)) {
+  for (const match of String(line || '').matchAll(markdownImagePattern)) {
     const target = String(match.groups?.target || '').trim().replace(/^<|>$/g, '');
-    if (target) targets.push(target);
+    if (target) targets.push({ target, index: match.index || 0 });
   }
-  for (const match of String(markdown || '').matchAll(htmlImageSrcPattern)) {
+  for (const match of String(line || '').matchAll(htmlImageSrcPattern)) {
     const target = String(match.groups?.src || '').trim();
-    if (target) targets.push(target);
+    if (target) targets.push({ target, index: match.index || 0 });
   }
-  return targets;
+  return targets.sort((a, b) => a.index - b.index);
+}
+
+function parseImageContextHeading(line) {
+  const hashMatch = String(line || '').match(/^\s{0,3}(#{1,6})\s+(.+)$/);
+  if (hashMatch) {
+    const title = cleanOutlineTitle(hashMatch[2]);
+    return title ? { level: Math.min(hashMatch[1].length, 6), title } : null;
+  }
+
+  const text = cleanOutlineTitle(line);
+  if (!text || text.length > 90 || /[。！？；;]$/.test(text) || /^\|/.test(text) || isCatalogTitleLine(text)) return null;
+  const marker = parseOutlineMarker(text);
+  const bold = /^\s*\*\*.+\*\*\s*$/.test(line);
+  if (!marker && !bold) return null;
+  return { level: marker?.level || 2, title: marker?.title || text };
+}
+
+function updateImageContextHeadings(headings, heading) {
+  while (headings.length && headings[headings.length - 1].level >= heading.level) headings.pop();
+  headings.push(heading);
+}
+
+function getPreviousImageSentence(value) {
+  const text = cleanMarkdownInlineText(value)
+    .replace(/\|/g, ' ')
+    .replace(/[\t ]+/g, ' ')
+    .trim();
+  const parts = text.split(/[。！？!?；;\n]+/).map((item) => cleanContentSentence(item)).filter(Boolean);
+  return (parts[parts.length - 1] || '').slice(0, 500);
+}
+
+function extractImageOccurrences(markdown) {
+  const lines = normalizeContentLineBreaks(String(markdown || '').replace(/```[\s\S]*?```/g, '\n')).split('\n');
+  const occurrences = [];
+  const headings = [];
+  let previousText = '';
+  let imageIndex = 0;
+
+  for (const line of lines) {
+    const heading = parseImageContextHeading(line);
+    if (heading) updateImageContextHeadings(headings, heading);
+
+    const targets = extractLineImageTargets(line);
+    for (const item of targets) {
+      const beforeImage = line.slice(0, item.index);
+      imageIndex += 1;
+      occurrences.push({
+        target: item.target,
+        index: imageIndex,
+        directory: headings.map((entry) => entry.title).join(' > '),
+        previous_sentence: getPreviousImageSentence(`${previousText}\n${beforeImage}`),
+      });
+    }
+
+    const cleanedLine = cleanMarkdownLine(line);
+    if (cleanedLine) {
+      previousText = `${previousText}\n${cleanedLine}`.slice(-4000);
+    }
+  }
+
+  return occurrences;
 }
 
 function isPathInsideDirectory(baseDir, targetPath) {
@@ -1919,16 +1980,21 @@ function createDuplicateCheckService({ app, configStore, workspaceStore } = {}) 
       const fileId = stableFileId(file);
       try {
         const markdown = await readContentMarkdown(contentFiles, file);
-        const targets = extractImageTargets(markdown);
-        totalImageCount += targets.length;
+        const imageOccurrences = extractImageOccurrences(markdown);
+        totalImageCount += imageOccurrences.length;
         const local = new Map();
-        for (const target of targets) {
+        for (const occurrence of imageOccurrences) {
           try {
-            const buffer = await readImageTargetBuffer(app, target);
+            const buffer = await readImageTargetBuffer(app, occurrence.target);
             if (!buffer?.length) continue;
             const hash = crypto.createHash('sha256').update(buffer).digest('hex');
-            const current = local.get(hash) || { count: 0, preview_url: target };
+            const current = local.get(hash) || { count: 0, preview_url: occurrence.target, locations: [] };
             current.count += 1;
+            current.locations.push({
+              image_index: occurrence.index,
+              directory: occurrence.directory,
+              previous_sentence: occurrence.previous_sentence,
+            });
             local.set(hash, current);
           } catch {
             // Ignore individual unreadable images; other images in the same file can still be compared.
@@ -1936,12 +2002,13 @@ function createDuplicateCheckService({ app, configStore, workspaceStore } = {}) 
         }
 
         for (const [hash, item] of local.entries()) {
-          const global = globalImages.get(hash) || { hash, preview_url: item.preview_url, file_ids: [], occurrences: {} };
+          const global = globalImages.get(hash) || { hash, preview_url: item.preview_url, file_ids: [], occurrences: {}, locations: {} };
           if (!global.file_ids.includes(fileId)) global.file_ids.push(fileId);
           global.occurrences[fileId] = item.count;
+          global.locations[fileId] = item.locations;
           globalImages.set(hash, global);
         }
-        results.push({ file_id: fileId, file_name: file.file_name, status: 'success', image_count: targets.length, unique_image_count: local.size });
+        results.push({ file_id: fileId, file_name: file.file_name, status: 'success', image_count: imageOccurrences.length, unique_image_count: local.size });
       } catch (error) {
         results.push({ file_id: fileId, file_name: file.file_name, status: 'error', image_count: 0, unique_image_count: 0, error: error.message || '图片比对失败' });
       }

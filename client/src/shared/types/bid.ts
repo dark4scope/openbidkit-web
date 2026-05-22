@@ -206,6 +206,11 @@ export interface DuplicateImageItem {
   preview_url: string;
   file_ids: string[];
   occurrences: Record<string, number>;
+  locations?: Record<string, Array<{
+    image_index: number;
+    directory: string;
+    previous_sentence: string;
+  }>>;
 }
 
 export interface DuplicateImageAnalysisState {
