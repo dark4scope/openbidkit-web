@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/React-19+-61dafb.svg" alt="React">
   <img src="https://img.shields.io/badge/TypeScript-5.9+-3178c6.svg" alt="TypeScript">
   <img src="https://img.shields.io/badge/Vite-7+-646cff.svg" alt="Vite">
+  <a href="https://deepwiki.com/FB208/OpenBidKit_Yibiao"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 </p>
 
 <p align="left">
