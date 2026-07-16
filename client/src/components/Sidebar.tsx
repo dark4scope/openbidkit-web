@@ -39,8 +39,6 @@ const navigationIcons: Record<SectionId, ComponentType<SVGProps<SVGSVGElement>>>
   settings: GearIcon,
 };
 
-const USER_GUIDE_URL = 'https://wiki.agnet.top/';
-
 function Sidebar({ activeSection, developerMode, onSectionChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { showToast } = useToast();
@@ -74,7 +72,6 @@ function Sidebar({ activeSection, developerMode, onSectionChange }: SidebarProps
           <img src={logoUrl} alt="" />
         </div>
         <div className="brand-copy">
-          <span>易标</span>
           <strong>投标工具箱</strong>
         </div>
       </div>
@@ -116,7 +113,6 @@ function Sidebar({ activeSection, developerMode, onSectionChange }: SidebarProps
       </nav>
 
       <div className="sidebar-footer">
-        {collapsed ? wrapTooltip('使用文档', renderUserGuideButton()) : renderUserGuideButton()}
         {collapsed ? wrapTooltip('设置', renderSettingsButton(activeSection, onSectionChange)) : renderSettingsButton(activeSection, onSectionChange)}
       </div>
     </aside>
@@ -156,24 +152,6 @@ function renderSettingsButton(activeSection: SectionId, onSectionChange: (sectio
   );
 }
 
-function renderUserGuideButton() {
-  return (
-    <button
-      type="button"
-      className="settings-trigger"
-      onClick={() => void openExternalUrl(USER_GUIDE_URL)}
-      aria-label="使用文档"
-    >
-      <span className="nav-icon" aria-hidden="true">
-        <BookIcon />
-      </span>
-      <span className="settings-copy">
-        <strong>使用文档</strong>
-        <small>教程与功能共创</small>
-      </span>
-    </button>
-  );
-}
 
 function wrapTooltip(label: string, child: ReactElement) {
   return (

@@ -1,14 +1,16 @@
 'use strict';
 
-// AI 配置的服务端预置 + 出入口脱敏。
-// - 新会话首次加载时，把 AI 供应商预置为 newapi（darkscope 免费池），用户无需自己填 key 即可用。
+// AI 配置的服务端强制内置 + 出入口脱敏。
+// - 每次会话构建都把 AI 供应商/模型/密钥/MinerU token 强制写成平台内置值（newapi 免费池），
+//   用户无需也无法改动；改模型/换 token 只需改 env 重启即可对所有账号（含已存在的）立即生效。
 // - config:load 出口把所有 api_key / mineru_token 换成掩码，不把真实 key 发给浏览器。
-// - config:save 入口把掩码值还原成已存的真实值（用户没改 key 时保持不变；改了则采用新值）。
+// - config:save 入口把掩码值还原成已存的真实值（用户没改 key 时保持不变）。
 
 const AI_BASE_URL = process.env.YIBIAO_AI_BASE_URL || 'https://newapi.darkscope.cn/v1';
 const AI_API_KEY = process.env.YIBIAO_AI_API_KEY || '';
 const TEXT_MODEL = process.env.YIBIAO_TEXT_MODEL || 'gpt-5.5';
 const IMAGE_MODEL = process.env.YIBIAO_IMAGE_MODEL || 'gpt-image-2';
+const MINERU_TOKEN = process.env.YIBIAO_MINERU_TOKEN || '';
 const TEXT_CONCURRENCY = Number(process.env.YIBIAO_TEXT_CONCURRENCY || 3);
 const IMAGE_CONCURRENCY = Number(process.env.YIBIAO_IMAGE_CONCURRENCY || 2);
 
@@ -18,11 +20,10 @@ function clone(obj) {
   return JSON.parse(JSON.stringify(obj || {}));
 }
 
-// 若会话尚未配置文本模型 key，则写入 newapi 预置配置。
+// 每次会话构建都强制写入 newapi 内置配置（模型/密钥/MinerU 由平台统一管理）。
 function seedConfig(configStore) {
-  if (!AI_API_KEY) return; // 未通过 env 提供 key，则不预置，交给用户在设置页自填
+  if (!AI_API_KEY) return; // 未通过 env 提供 key，则不强制，交给用户在设置页自填
   const cur = configStore.load();
-  if (cur.api_key && String(cur.api_key).trim()) return; // 已配置，尊重用户既有设置
 
   const textProfile = {
     api_key: AI_API_KEY,
@@ -59,6 +60,15 @@ function seedConfig(configStore) {
     text_model_profiles: { ...cur.text_model_profiles, custom: textProfile },
     image_model: imageProfile,
     image_model_profiles: { ...cur.image_model_profiles, custom: imageProfile },
+    // 文件解析器：内置 MinerU token（云端解析可选），默认仍走本地解析。
+    components: {
+      ...(cur.components || {}),
+      file_parser: {
+        ...((cur.components && cur.components.file_parser) || {}),
+        provider: (cur.components && cur.components.file_parser && cur.components.file_parser.provider) || 'local',
+        mineru_token: MINERU_TOKEN || ((cur.components && cur.components.file_parser && cur.components.file_parser.mineru_token) || ''),
+      },
+    },
   };
   configStore.save(next);
 }

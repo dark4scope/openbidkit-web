@@ -1429,36 +1429,7 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
                 <option value="classic">经典布局</option>
               </select>
             </div>
-            <label className="settings-row">
-              <div className="settings-row-copy">
-                <strong>自动更新渠道</strong>
-                <span>{updateChannelOptions.find((option) => option.value === state.general.update_channel)?.description || '选择自动检查更新和下载客户端安装包的来源'}</span>
-              </div>
-              <select
-                value={state.general.update_channel}
-                onChange={(event) => updateUpdateChannel(event.target.value as UpdateChannel)}
-              >
-                {updateChannelOptions.map((option) => (
-                  <option value={option.value} key={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="settings-row">
-              <div className="settings-row-copy">
-                <strong>GPU 硬件加速</strong>
-                <span>启用后界面可能更流畅；极少数电脑启用后会闪退，关闭后兼容性更好。修改后需重启生效。</span>
-              </div>
-              <span className="yb-switch-control">
-                <input
-                  type="checkbox"
-                  checked={state.general.gpu_hardware_acceleration_enabled}
-                  onChange={(event) => updateGpuHardwareAcceleration(event.target.checked)}
-                />
-                <span className="yb-switch-track" aria-hidden="true">
-                  <span className="yb-switch-thumb" />
-                </span>
-              </span>
-            </label>
+            {/* darkscope-web：已移除桌面版「自动更新渠道」与「GPU 硬件加速」设置（Web 版不适用） */}
             <label className="settings-row">
               <div className="settings-row-copy">
                 <strong>开发者模式</strong>
@@ -2120,86 +2091,28 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
             <span />
             <strong>关于</strong>
           </div>
-          <div className="about-overview">
-            <article className="about-update-card">
-              <div className="about-card-head">
-                <span>自动更新</span>
-                <strong>当前版本 {appVersion || '...'}</strong>
-              </div>
-              <p>{updateStatusText}</p>
-              <button
-                type="button"
-                className="update-button"
-                disabled={updateBusy}
-                onClick={() => {
-                  if (updateStatus === 'downloaded') {
-                    void installDownloadedUpdate();
-                    return;
-                  }
-                  void checkForUpdates();
-                }}
-              >
-                {updateStatus === 'downloaded' ? '安装并重启' : updateBusy ? '检查中...' : '检查更新'}
-              </button>
-            </article>
-            <article className="about-info-card about-links-card">
-              <span>信息与授权</span>
-              <ul className="about-links-list">
-                <li className="about-links-item">
-                  <span className="about-links-label">GitHub 仓库</span>
-                  <a
-                    className="about-links-value is-link"
-                    href="https://github.com/FB208/OpenBidKit_Yibiao"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    FB208/OpenBidKit_Yibiao
-                  </a>
-                </li>
-                <li className="about-links-item">
-                  <span className="about-links-label">使用文档</span>
-                  <a
-                    className="about-links-value is-link"
-                    href="https://wiki.agnet.top/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    wiki.agnet.top
-                  </a>
-                </li>
-                <li className="about-links-item">
-                  <span className="about-links-label">客户端授权状态</span>
-                  <span className={`about-links-value ${licenseStatus?.sourceTrusted ? 'is-trusted' : 'is-untrusted'}`}>
-                    {licenseSourceLabel}
-                  </span>
-                </li>
-              </ul>
-              <button type="button" className="about-links-activate" onClick={() => setOfflineLicenseDialogOpen(true)}>
-                离线激活授权
-              </button>
-            </article>
-          </div>
+          {/* darkscope-web：已移除桌面版「自动更新」与「信息与授权」（GitHub/客户端授权/外链）板块 */}
           <div className="privacy-statement">
             <div className="privacy-statement-head">
               <span>Privacy</span>
               <strong>隐私声明</strong>
-              <p>本工具尽量把数据处理留在本机和你自行选择的服务商之间，只保留运行所必需的最少信息。</p>
+              <p>本在线服务只保留运行所必需的最少信息，不接入任何第三方统计。</p>
             </div>
             <div className="privacy-list">
               <article className="privacy-item">
                 <span>01</span>
-                <strong>你的业务数据不会被我收集</strong>
-                <p>应用不会上传、收集或保存你配置的 API Key、导入的招标文件、解析后的文档内容、生成的方案正文、导出文件或其他业务结果。</p>
+                <strong>账号之间数据互相隔离</strong>
+                <p>每个账号拥有独立的工作区，你导入的招标文件、生成的方案与知识库对其他账号不可见。</p>
               </article>
               <article className="privacy-item">
                 <span>02</span>
-                <strong>线上 AI 请求只发送给你配置的服务商</strong>
-                <p>当你使用 OpenAI 兼容接口、MinerU 或其他线上 API 时，应用会把完成任务所需的内容发送给你自行配置的服务商。这是实现文档解析、内容生成、模型测试等功能的必要步骤；这些请求不经过我的服务器，我也不会额外留存任何请求内容或生成结果。</p>
+                <strong>业务数据仅用于生成标书</strong>
+                <p>招标文件、解析结果与生成正文仅用于为你完成标书撰写，不用于任何其它用途。请勿上传涉密招标文件。</p>
               </article>
               <article className="privacy-item">
                 <span>03</span>
-                <strong>匿名埋点只用于了解功能使用情况</strong>
-                <p>为了判断开源项目是否有人使用、哪些功能更常用，应用会把匿名页面访问和功能使用次数上报到 Cloudflare。统计不包含文档内容、文件名、本地路径、API Key、用户输入、生成结果或任何可还原业务内容的信息。</p>
+                <strong>不做第三方埋点统计</strong>
+                <p>本站已关闭所有匿名埋点，不向任何第三方统计服务上报页面访问或功能使用数据。</p>
               </article>
             </div>
           </div>

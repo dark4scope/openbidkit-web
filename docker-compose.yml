@@ -13,12 +13,13 @@ services:
     environment:
       - YIBIAO_AI_BASE_URL=https://newapi.darkscope.cn/v1
       - YIBIAO_AI_API_KEY=${YIBIAO_AI_API_KEY}
-      - YIBIAO_TEXT_MODEL=gpt-5.5
+      - YIBIAO_MINERU_TOKEN=${YIBIAO_MINERU_TOKEN}
+      - YIBIAO_TEXT_MODEL=gpt-5.6-sol
       - YIBIAO_IMAGE_MODEL=gpt-image-2
       - YIBIAO_TEXT_CONCURRENCY=3
       - YIBIAO_IMAGE_CONCURRENCY=2
       - YIBIAO_GLOBAL_MAX_TASKS=3
       - YIBIAO_PER_SESSION_MAX_TASKS=2
       - YIBIAO_MAX_SESSIONS=60
-      - YIBIAO_VERSION=0.1.0-web
+      - YIBIAO_VERSION=v1
       - YIBIAO_SOURCE_URL=https://github.com/dark4scope/openbidkit-web

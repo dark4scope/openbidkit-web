@@ -1,11 +1,5 @@
 import type { AppMenuItem, SectionId } from '../shared/types/navigation';
 
-const githubStarNotice = {
-  message: '正在开发中，在github给作者点个star，可以加速开发。',
-  actionLabel: '点此直达',
-  externalUrl: 'https://github.com/FB208/OpenBidKit_Yibiao',
-};
-
 export const appMenuItems: AppMenuItem[] = [
   {
     id: 'bid-generation',
@@ -28,9 +22,7 @@ export const appMenuItems: AppMenuItem[] = [
         id: 'business-bid',
         label: '商务标',
         description: '整理商务响应、报价口径和合同偏离材料。',
-        icon: 'briefcase',
-        notice: githubStarNotice,
-      },
+        icon: 'briefcase',      },
     ],
   },
   {
@@ -67,9 +59,7 @@ export const appMenuItems: AppMenuItem[] = [
         id: 'image-knowledge-base',
         label: '图片知识库',
         description: '管理图片素材、图示和视觉参考资料',
-        icon: 'file',
-        notice: githubStarNotice,
-      },
+        icon: 'file',      },
     ],
   },
   {
@@ -93,22 +83,10 @@ export const appMenuItems: AppMenuItem[] = [
         id: 'ai-evaluation',
         label: 'AI评标',
         description: '模拟AI评标，对标书进行打分，出具评标报告',
-        icon: 'tool',
-        notice: githubStarNotice,
-      },
+        icon: 'tool',      },
     ],
   },
-  {
-    id: 'bid-opportunity',
-    label: '投标机会',
-    description: '机会发现与线索跟踪',
-    notice: githubStarNotice,
-  },
-  {
-    id: 'resources',
-    label: '资源下载',
-    description: '投标相关资料、工具下载',
-  },
+  // darkscope-web：已下线「投标机会」「资源下载」两个导航（用户要求）。
 ];
 
 const developerMenuItems: AppMenuItem[] = [

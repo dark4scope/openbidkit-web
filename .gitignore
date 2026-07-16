@@ -11,6 +11,9 @@ uploads/
 *.docx
 *.pdf
 
+# 运行时数据：每用户 workspace / sqlite / 上传 / auth.db —— 绝不入库
+/data/
+
 # 构建和打包相关
 dist/
 build/

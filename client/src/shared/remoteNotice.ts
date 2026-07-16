@@ -1,4 +1,3 @@
-const NOTICE_ENDPOINT = 'https://analytics.agnet.top/notice';
 const PROJECT_NAME = 'yibiao-client';
 const DISMISSED_NOTICE_ID_KEY = 'remote_notice_dismissed_id';
 const LOG_PREFIX = '[remote-notice]';
@@ -56,30 +55,7 @@ function normalizeNotice(notice: RemoteNotice | null | undefined): RemoteNotice 
   };
 }
 
-export async function fetchRemoteNotice() {
-  const url = new URL(NOTICE_ENDPOINT);
-  url.searchParams.set('projectName', PROJECT_NAME);
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      Accept: 'application/json',
-    },
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    console.info(LOG_PREFIX, 'request failed', response.status);
-    return null;
-  }
-
-  const data = await response.json().catch(() => null) as RemoteNoticeResponse | null;
-  console.info(LOG_PREFIX, 'response', data);
-  if (!data || data.code !== 0) {
-    console.info(LOG_PREFIX, 'invalid response', data?.code);
-    return null;
-  }
-
-  const notice = normalizeNotice(data.notice);
-  console.info(LOG_PREFIX, 'normalized notice', notice?.id || null);
-  return notice;
+export async function fetchRemoteNotice(): Promise<RemoteNotice | null> {
+  // darkscope-web：已关闭远程公告拉取，不再向任何外部服务请求。
+  return null;
 }

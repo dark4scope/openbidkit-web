@@ -12,6 +12,7 @@ async function ipc<T = any>(channel: string, ...args: any[]): Promise<T> {
     body: JSON.stringify({ args }),
     credentials: 'same-origin',
   });
+  if (res.status === 401) { handleAuthLost(); throw new Error('登录已失效，请重新登录'); }
   if (!res.ok) throw new Error(`请求失败 (${res.status})`);
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || '请求失败');
@@ -61,41 +62,149 @@ function subscribe(channel: string, cb: Listener): () => void {
   return () => { listeners.get(channel)?.delete(cb); };
 }
 
-// ---- 文件选择 + multipart 上传（替代本地文件对话框）----
-function pickFiles({ multiple = true, accept = '' }: { multiple?: boolean; accept?: string }): Promise<File[]> {
-  return new Promise((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = multiple;
-    if (accept) input.accept = accept;
-    input.style.display = 'none';
-    document.body.appendChild(input);
-    let settled = false;
-    const done = (files: File[]) => {
-      if (settled) return;
-      settled = true;
-      input.remove();
-      resolve(files);
-    };
-    input.addEventListener('change', () => done(Array.from(input.files || [])));
-    input.addEventListener('cancel', () => done([]));
-    // 兜底：窗口重新聚焦后若未选择文件，判定为取消
-    const onFocus = () => setTimeout(() => { if (!settled && (!input.files || input.files.length === 0)) done([]); }, 500);
-    window.addEventListener('focus', onFocus, { once: true });
-    input.click();
-  });
+// ---- 会话失效：任何业务请求返回 401 时回到登录页 ----
+let authLostHandled = false;
+function handleAuthLost() {
+  if (authLostHandled) return;
+  authLostHandled = true;
+  try { window.location.reload(); } catch { /* ignore */ }
 }
 
+// ---- 导入对话框：本地文件 或 粘贴下载链接（URL 由服务端拉取，走同一解析链路）----
+let importStyleInjected = false;
+function injectImportStyle() {
+  if (importStyleInjected) return;
+  importStyleInjected = true;
+  const css = `
+  .yb-imp-mask{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:rgba(15,18,26,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+  .yb-imp-card{width:min(440px,92vw);background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.28);padding:22px;color:#1f2430;animation:yb-imp-in .16s ease}
+  @keyframes yb-imp-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  .yb-imp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .yb-imp-title{font-size:16px;font-weight:600}
+  .yb-imp-x{border:none;background:transparent;font-size:20px;line-height:1;color:#9aa0ad;cursor:pointer;padding:2px 6px;border-radius:8px}
+  .yb-imp-x:hover{background:#f1f2f5;color:#3a3f4b}
+  .yb-imp-drop{border:1.5px dashed #cfd3dd;border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:.15s;background:#fafbfc}
+  .yb-imp-drop:hover{border-color:#5b74e6;background:#f5f7ff}
+  .yb-imp-drop b{display:block;font-size:14px;color:#2b3140;margin-bottom:3px}
+  .yb-imp-drop small{color:#98a0ae;font-size:12px}
+  .yb-imp-or{display:flex;align-items:center;gap:10px;color:#b3b8c4;font-size:12px;margin:14px 0}
+  .yb-imp-or::before,.yb-imp-or::after{content:"";flex:1;height:1px;background:#e8eaef}
+  .yb-imp-urlrow{display:flex;gap:8px}
+  .yb-imp-url{flex:1;height:38px;border:1px solid #d7dae2;border-radius:9px;padding:0 12px;font-size:13px;outline:none;color:#1f2430;background:#fff}
+  .yb-imp-url:focus{border-color:#5b74e6;box-shadow:0 0 0 3px rgba(91,116,230,.15)}
+  .yb-imp-go{height:38px;padding:0 15px;border:none;border-radius:9px;background:#5b74e6;color:#fff;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+  .yb-imp-go:hover{background:#4a63d8}
+  .yb-imp-go:disabled{opacity:.55;cursor:default}
+  .yb-imp-err{color:#e5484d;font-size:12px;margin-top:10px}
+  .yb-imp-busy{text-align:center;padding:26px 0;color:#6b7280;font-size:13px}
+  .yb-imp-spin{width:26px;height:26px;border:3px solid #e5e8ef;border-top-color:#5b74e6;border-radius:50%;margin:0 auto 12px;animation:yb-imp-spin .8s linear infinite}
+  @keyframes yb-imp-spin{to{transform:rotate(360deg)}}
+  @media (prefers-color-scheme:dark){.yb-imp-card{background:#20242e;color:#e6e8ee}.yb-imp-drop{background:#262b36;border-color:#3a4150}.yb-imp-drop b{color:#e6e8ee}.yb-imp-url{background:#262b36;border-color:#3a4150;color:#e6e8ee}.yb-imp-x:hover{background:#2c313c}}
+  `;
+  const el = document.createElement('style');
+  el.textContent = css;
+  document.head.appendChild(el);
+}
+
+// 显示导入模态，处理文件上传 / URL 拉取的完整网络流程，resolve 服务端 handler 结果；取消 -> {success:false}
 async function uploadDialog(channel: string, opts: { multiple?: boolean; accept?: string } = {}, args: any[] = []): Promise<any> {
-  const files = await pickFiles({ multiple: opts.multiple !== false, accept: opts.accept || '' });
-  if (!files.length) return { success: false, message: '已取消选择' };
-  const fd = new FormData();
-  for (const f of files) fd.append('files', f, f.name);
-  if (args.length) fd.append('args', JSON.stringify(args));
-  const res = await fetch(`${API}/api/upload/${channel}`, { method: 'POST', body: fd, credentials: 'same-origin' });
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || '上传失败');
-  return data.result;
+  injectImportStyle();
+  const multiple = opts.multiple !== false;
+  const accept = opts.accept || '';
+
+  return new Promise<any>((resolve, reject) => {
+    const mask = document.createElement('div');
+    mask.className = 'yb-imp-mask';
+    mask.innerHTML = `
+      <div class="yb-imp-card" role="dialog" aria-modal="true">
+        <div class="yb-imp-head">
+          <span class="yb-imp-title">导入文件</span>
+          <button type="button" class="yb-imp-x" aria-label="关闭">&times;</button>
+        </div>
+        <div class="yb-imp-body">
+          <div class="yb-imp-drop" tabindex="0">
+            <b>📁 选择本地文件</b>
+            <small>${multiple ? '支持一次选择多个文件' : '选择单个文件'}</small>
+          </div>
+          <div class="yb-imp-or">或</div>
+          <div class="yb-imp-urlrow">
+            <input class="yb-imp-url" type="url" inputmode="url" placeholder="粘贴文件下载链接（http/https）" />
+            <button type="button" class="yb-imp-go">从链接导入</button>
+          </div>
+          <div class="yb-imp-err" style="display:none"></div>
+        </div>
+      </div>`;
+    document.body.appendChild(mask);
+
+    const card = mask.querySelector('.yb-imp-card') as HTMLElement;
+    const body = mask.querySelector('.yb-imp-body') as HTMLElement;
+    const errBox = mask.querySelector('.yb-imp-err') as HTMLElement;
+    const drop = mask.querySelector('.yb-imp-drop') as HTMLElement;
+    const urlInput = mask.querySelector('.yb-imp-url') as HTMLInputElement;
+    const goBtn = mask.querySelector('.yb-imp-go') as HTMLButtonElement;
+    const closeBtn = mask.querySelector('.yb-imp-x') as HTMLButtonElement;
+
+    let done = false;
+    const cleanup = () => { mask.remove(); window.removeEventListener('keydown', onKey); };
+    const cancel = () => { if (done) return; done = true; cleanup(); resolve({ success: false, message: '已取消' }); };
+    const fail = (msg: string) => { if (done) return; done = true; cleanup(); reject(new Error(msg)); };
+    const succeed = (result: any) => { if (done) return; done = true; cleanup(); resolve(result); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cancel(); };
+    window.addEventListener('keydown', onKey);
+    mask.addEventListener('mousedown', (e) => { if (e.target === mask) cancel(); });
+    closeBtn.addEventListener('click', cancel);
+
+    const showError = (msg: string) => { errBox.textContent = msg; errBox.style.display = 'block'; };
+    const showBusy = (text: string) => { body.innerHTML = `<div class="yb-imp-busy"><div class="yb-imp-spin"></div>${text}</div>`; };
+
+    // 本地文件
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = multiple;
+    if (accept) fileInput.accept = accept;
+    fileInput.style.display = 'none';
+    card.appendChild(fileInput);
+    drop.addEventListener('click', () => fileInput.click());
+    drop.addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') fileInput.click(); });
+    fileInput.addEventListener('change', async () => {
+      const files = Array.from(fileInput.files || []);
+      if (!files.length) return;
+      showBusy('正在上传并解析…');
+      try {
+        const fd = new FormData();
+        for (const f of files) fd.append('files', f, f.name);
+        if (args.length) fd.append('args', JSON.stringify(args));
+        const res = await fetch(`${API}/api/upload/${channel}`, { method: 'POST', body: fd, credentials: 'same-origin' });
+        if (res.status === 401) { handleAuthLost(); return fail('登录已失效，请重新登录'); }
+        const data = await res.json();
+        if (!data.ok) return fail(data.error || '上传失败');
+        succeed(data.result);
+      } catch (e: any) { fail(e?.message || '上传失败'); }
+    });
+
+    // 下载链接
+    const doUrl = async () => {
+      const url = urlInput.value.trim();
+      if (!/^https?:\/\/.+/i.test(url)) { showError('请输入有效的 http/https 链接'); return; }
+      goBtn.disabled = true;
+      showBusy('正在从链接下载并解析…');
+      try {
+        const res = await fetch(`${API}/api/fetch-url/${channel}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, args }),
+          credentials: 'same-origin',
+        });
+        if (res.status === 401) { handleAuthLost(); return fail('登录已失效，请重新登录'); }
+        const data = await res.json();
+        if (!data.ok) return fail(data.error || '导入失败');
+        succeed(data.result);
+      } catch (e: any) { fail(e?.message || '导入失败'); }
+    };
+    goBtn.addEventListener('click', doUrl);
+    urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doUrl(); });
+    setTimeout(() => urlInput.focus(), 30);
+  });
 }
 
 function triggerDownload(blob: Blob, filename: string) {
@@ -113,7 +222,7 @@ function triggerDownload(blob: Blob, filename: string) {
 const DOC_ACCEPT = '.pdf,.doc,.docx,.wps,.txt,.md,.html,.htm,.xls,.xlsx,.ppt,.pptx';
 
 const bridge = {
-  appName: '易标投标工具箱',
+  appName: '投标工具箱',
   platform: 'web',
   getVersion: () => ipc('app:get-version'),
   getGpuHardwareAccelerationStatus: () => ipc('app:get-gpu-hardware-acceleration-status'),
