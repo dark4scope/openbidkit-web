@@ -10,12 +10,11 @@ type SettingsTab = 'general' | 'text-model' | 'image-model' | 'components' | 'ag
 type UpdateStatus = 'idle' | 'checking' | 'downloading' | 'downloaded' | 'error' | 'disabled';
 type AgentSelfCheckUiStatus = 'untested' | 'checking' | 'normal' | 'busy' | 'error';
 
+// darkscope-web：模型/密钥/MinerU 已由平台统一内置，用户无需也无法配置；
+// 智能体为桌面本地能力，Web 版不支持。故仅保留「通用」「关于」两个 tab，
+// 同时移除了文本/生图/组件/智能体配置里的全部第三方供应商外链。
 const settingsTabs: Array<{ id: SettingsTab; label: string }> = [
   { id: 'general', label: '通用' },
-  { id: 'text-model', label: '文本模型' },
-  { id: 'image-model', label: '生图模型' },
-  { id: 'components', label: '组件设置' },
-  { id: 'agent', label: '智能体配置' },
   { id: 'about', label: '关于' },
 ];
 

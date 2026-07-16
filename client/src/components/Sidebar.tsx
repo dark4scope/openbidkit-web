@@ -3,7 +3,6 @@ import { useState, type ComponentType, type ReactElement, type SVGProps } from '
 import { getAppMenuItems, getParentMenuItemBySection } from '../app/menuConfig';
 import type { AppMenuItem, SectionId } from '../shared/types/navigation';
 import { useToast } from '../shared/ui';
-import logoUrl from '../../assets/icon_256.png';
 
 interface SidebarProps {
   activeSection: SectionId;
@@ -69,7 +68,10 @@ function Sidebar({ activeSection, developerMode, onSectionChange }: SidebarProps
 
       <div className="brand-block">
         <div className="brand-mark" aria-hidden="true">
-          <img src={logoUrl} alt="" />
+          <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none">
+            <rect x="4" y="3" width="16" height="18" rx="3" fill="#5b74e6" />
+            <path d="M8 8.5h8M8 12h8M8 15.5h5" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" />
+          </svg>
         </div>
         <div className="brand-copy">
           <strong>投标工具箱</strong>

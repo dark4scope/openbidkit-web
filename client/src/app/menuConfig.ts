@@ -18,11 +18,7 @@ export const appMenuItems: AppMenuItem[] = [
         description: '解决人写技术方案太薄的问题，上传写好的方案，进行优化和扩充，遵从原方案真实可落地，又能扩写出厚厚的标书',
         icon: 'expand',
       },
-      {
-        id: 'business-bid',
-        label: '商务标',
-        description: '整理商务响应、报价口径和合同偏离材料。',
-        icon: 'briefcase',      },
+      // darkscope-web：下线在建功能「商务标」
     ],
   },
   {
@@ -55,11 +51,7 @@ export const appMenuItems: AppMenuItem[] = [
         description: '管理文档资料、案例素材和可复用知识条目',
         icon: 'document',
       },
-      {
-        id: 'image-knowledge-base',
-        label: '图片知识库',
-        description: '管理图片素材、图示和视觉参考资料',
-        icon: 'file',      },
+      // darkscope-web：下线在建功能「图片知识库」
     ],
   },
   {
@@ -79,11 +71,7 @@ export const appMenuItems: AppMenuItem[] = [
         description: '硬性条款与响应完整性',
         icon: 'shield',
       },
-      {
-        id: 'ai-evaluation',
-        label: 'AI评标',
-        description: '模拟AI评标，对标书进行打分，出具评标报告',
-        icon: 'tool',      },
+      // darkscope-web：下线在建功能「AI评标」
     ],
   },
   // darkscope-web：已下线「投标机会」「资源下载」两个导航（用户要求）。
