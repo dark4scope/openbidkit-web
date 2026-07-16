@@ -223,6 +223,18 @@ function sanitize(name) {
 // ---- 健康检查 ----
 app.get('/healthz', (req, res) => res.json({ ok: true, activeTasks: totalActiveTasks() }));
 
+// ---- AGPL 合规：修改版源代码可获取 (§13) + NOTICE 保留 (§7b) ----
+const SOURCE_URL = process.env.YIBIAO_SOURCE_URL || 'https://github.com/dark4scope/openbidkit-web';
+app.get('/source', (_req, res) => res.redirect(302, SOURCE_URL));
+app.get('/NOTICE', (_req, res) => {
+  try {
+    const notice = fs.readFileSync(path.resolve(__dirname, '..', 'NOTICE'), 'utf-8');
+    res.type('text/plain; charset=utf-8').send(notice);
+  } catch {
+    res.type('text/plain; charset=utf-8').send('OpenBidKit_Yibiao (mark/yibiaoai) · AGPL-3.0\nSource: ' + SOURCE_URL);
+  }
+});
+
 // ---- 静态前端 + SPA fallback ----
 app.use(express.static(DIST_DIR));
 app.get(/^(?!\/api\/).*/, (req, res, next) => {

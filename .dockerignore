@@ -1,0 +1,10 @@
+**/node_modules
+client/dist
+client/release
+data
+.git
+.gitignore
+*.log
+scratchpad
+patch.diff
+tmp_outline_diff.patch

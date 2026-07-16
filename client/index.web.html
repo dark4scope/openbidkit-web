@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>易标投标工具箱</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/web-entry.tsx"></script>
+    <!-- AGPL-3.0 署名（§7b 保留 + §13 源码可获取）。React 仅接管 #root，不影响此节点。 -->
+    <div id="agpl-footer">基于 <a href="https://github.com/FB208/OpenBidKit_Yibiao" target="_blank" rel="noopener">OpenBidKit</a> (mark/yibiaoai) · AGPL-3.0 · <a href="/source" target="_blank" rel="noopener">源代码</a></div>
+    <style>
+      #agpl-footer{position:fixed;right:8px;bottom:6px;z-index:2147483647;font-size:11px;line-height:1.4;color:rgba(120,120,130,.6);background:rgba(255,255,255,.62);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);padding:2px 9px;border-radius:9px;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+      #agpl-footer a{color:rgba(88,104,190,.85);text-decoration:none}
+      #agpl-footer a:hover{text-decoration:underline}
+      @media (prefers-color-scheme: dark){#agpl-footer{color:rgba(180,182,190,.6);background:rgba(30,32,38,.62)}#agpl-footer a{color:rgba(140,160,240,.85)}}
+      @media (max-width:640px){#agpl-footer{font-size:10px;right:4px;bottom:4px;padding:2px 6px}}
+    </style>
+  </body>
+</html>

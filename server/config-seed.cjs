@@ -48,6 +48,14 @@ function seedConfig(configStore) {
   const next = {
     ...cur,
     text_model_provider: 'custom',
+    // 顶层扁平字段必须一并写：provider=custom 时 normalizeConfig 会用这些扁平字段重建 custom profile，
+    // 只写嵌套 profile 会被空的顶层字段覆盖回默认 gpt-3.5-turbo。
+    api_key: AI_API_KEY,
+    base_url: AI_BASE_URL,
+    model_name: TEXT_MODEL,
+    context_length_limit: 400000,
+    concurrency_limit: TEXT_CONCURRENCY,
+    request_mode: 'stream',
     text_model_profiles: { ...cur.text_model_profiles, custom: textProfile },
     image_model: imageProfile,
     image_model_profiles: { ...cur.image_model_profiles, custom: imageProfile },
