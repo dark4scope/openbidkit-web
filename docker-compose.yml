@@ -22,4 +22,4 @@ services:
       - YIBIAO_PER_SESSION_MAX_TASKS=2
       - YIBIAO_MAX_SESSIONS=60
       - YIBIAO_VERSION=v1
-      - YIBIAO_SOURCE_URL=https://github.com/dark4scope/openbidkit-web
+      - YIBIAO_SOURCE_URL=https://github.com/dark4scope/openbidkit-web/tree/darkscope-web
