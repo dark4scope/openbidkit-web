@@ -75,19 +75,19 @@ const DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT = 400000;
 const DEFAULT_TEXT_CONCURRENCY_LIMIT = 10;
 
 const textProviderDefaults: Record<ConfiguredTextModelProvider, TextModelConfig> = {
-  jinlong: { api_key: '', base_url: 'https://jlaudeapi.com/v1', model_name: 'gpt-3.5-turbo', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
-  volcengine: { api_key: '', base_url: 'https://ark.cn-beijing.volces.com/api/v3', model_name: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
-  deepseek: { api_key: '', base_url: 'https://api.deepseek.com', model_name: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
-  longcat: { api_key: '', base_url: 'https://api.longcat.chat/openai/v1', model_name: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
-  agnes: { api_key: '', base_url: 'https://apihub.agnes-ai.com/v1', model_name: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
+  jinlong: { api_key: '', base_url: '', model_name: 'gpt-3.5-turbo', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
+  volcengine: { api_key: '', base_url: '', model_name: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
+  deepseek: { api_key: '', base_url: '', model_name: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
+  longcat: { api_key: '', base_url: '', model_name: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
+  agnes: { api_key: '', base_url: '', model_name: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
   custom: { api_key: '', base_url: '', model_name: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, request_mode: 'stream' },
 };
 
 const textProviderApiKeyUrls: Partial<Record<ConfiguredTextModelProvider, string>> = {
-  jinlong: 'https://s.markup.com.cn/jl',
-  volcengine: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
-  deepseek: 'https://platform.deepseek.com/api_keys',
-  agnes: 'https://platform.agnes-ai.com/settings/apiKeys',
+  jinlong: '',
+  volcengine: '',
+  deepseek: '',
+  agnes: '',
 };
 
 function createDefaultTextModelProfiles(): TextModelProfiles {
@@ -206,7 +206,7 @@ function normalizeImageSize(provider: ImageModelProvider, value?: string): Image
 const imageProviderDefaults: ImageModelProfiles = {
   jinlong: {
     provider: 'jinlong',
-    base_url: 'https://img-api.jlaudeapi.com/v1',
+    base_url: '',
     api_key: '',
     model_name: 'gpt-image-2',
     image_size: '1024x1024',
@@ -218,7 +218,7 @@ const imageProviderDefaults: ImageModelProfiles = {
   },
   volcengine: {
     provider: 'volcengine',
-    base_url: 'https://ark.cn-beijing.volces.com/api/v3',
+    base_url: '',
     api_key: '',
     model_name: '',
     image_size: '1024x1024',
@@ -230,7 +230,7 @@ const imageProviderDefaults: ImageModelProfiles = {
   },
   'google-ai-studio': {
     provider: 'google-ai-studio',
-    base_url: 'https://generativelanguage.googleapis.com/v1beta',
+    base_url: '',
     api_key: '',
     model_name: 'gemini-3.1-flash-image-preview',
     image_size: '1K',
@@ -242,7 +242,7 @@ const imageProviderDefaults: ImageModelProfiles = {
   },
   agnes: {
     provider: 'agnes',
-    base_url: 'https://apihub.agnes-ai.com/v1',
+    base_url: '',
     api_key: '',
     model_name: '',
     image_size: '1024x1024',
@@ -267,10 +267,10 @@ const imageProviderDefaults: ImageModelProfiles = {
 };
 
 const imageProviderApiKeyUrls: Record<ImageModelProvider, string> = {
-  jinlong: 'https://s.markup.com.cn/jl',
-  volcengine: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
-  'google-ai-studio': 'https://aistudio.google.com/api-keys',
-  agnes: 'https://platform.agnes-ai.com/settings/apiKeys',
+  jinlong: '',
+  volcengine: '',
+  'google-ai-studio': '',
+  agnes: '',
   custom: '',
 };
 
@@ -1523,7 +1523,7 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
               <input
                 type="text"
                 value={state.textModel.base_url}
-                placeholder={currentTextProviderDefault.base_url || '例如 https://api.openai.com/v1'}
+                placeholder={currentTextProviderDefault.base_url || '例如 '}
                 onChange={(event) => updateTextModelConfig({ base_url: event.target.value }, { clearModels: true })}
                 disabled={state.textModel.provider !== 'custom'}
               />

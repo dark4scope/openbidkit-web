@@ -16,7 +16,8 @@ RUN npx vite build --config ./vite.web.config.ts
 # ---------- Stage 2: 运行时 ----------
 FROM node:22-bookworm AS runtime
 ENV http_proxy="" https_proxy="" HTTP_PROXY="" HTTPS_PROXY="" \
-    NODE_ENV=production PORT=3000 HOST=0.0.0.0 YIBIAO_DATA_DIR=/app/data
+    NODE_ENV=production PORT=3000 HOST=0.0.0.0 YIBIAO_DATA_DIR=/app/data \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 RUN set -eux; \
     if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
@@ -25,7 +26,8 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
       libreoffice-writer libreoffice-calc \
-      fonts-noto-cjk fonts-noto-cjk-extra \
+      fonts-noto-cjk fonts-noto-cjk-extra fonts-liberation \
+      chromium \
       python3 build-essential ca-certificates; \
     rm -rf /var/lib/apt/lists/*
 

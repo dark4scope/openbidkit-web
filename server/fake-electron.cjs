@@ -87,19 +87,111 @@ const shell = {
   beep: () => {},
 };
 
-// ---- BrowserWindow：阶段A降级。localImageRenderService 用它做离屏图表渲染，
-//      new 时抛错 -> 上游 renderMermaid/Html 抛 -> 配图/导出侧已有容错（保留正文/跳过图）。
-//      阶段B将用 puppeteer 提供可用实现。
+// ---- BrowserWindow：puppeteer 无头 chromium 离屏渲染（阶段B，图表转图可用）。----
+//      localImageRenderService 用 new BrowserWindow(同步) + await loadURL/executeJavaScript +
+//      webContents.debugger.sendCommand(CDP) 截图。这里把这套 Electron 面映射到 puppeteer。
+const { getBrowser } = require('./puppeteer-pool.cjs');
+
+class FakeWebContents {
+  constructor(viewport) {
+    this._listeners = new Map();
+    this._cdp = null;
+    this._attached = false;
+    const self = this;
+    this.debugger = {
+      isAttached: () => self._attached,
+      attach: () => { self._attached = true; },
+      detach: () => { self._attached = false; self._cdp = null; },
+      sendCommand: async (method, params) => {
+        const cdp = await self._ensureCdp();
+        return cdp.send(method, params || {});
+      },
+    };
+    // 同步启动 page 创建（constructor 必须同步返回）；后续方法内部 await 之。
+    this._pagePromise = (async () => {
+      const browser = await getBrowser();
+      const page = await browser.newPage();
+      try {
+        await page.setViewport({
+          width: Math.max(1, Math.round(viewport.width || 800)),
+          height: Math.max(1, Math.round(viewport.height || 600)),
+        });
+      } catch { /* ignore */ }
+      return page;
+    })();
+    this._pagePromise.catch(() => { /* 失败在 loadURL 时重新抛 */ });
+  }
+
+  async _ensureCdp() {
+    const page = await this._pagePromise;
+    if (!this._cdp) this._cdp = await page.target().createCDPSession();
+    return this._cdp;
+  }
+
+  _add(event, cb, once) {
+    if (!this._listeners.has(event)) this._listeners.set(event, new Set());
+    this._listeners.get(event).add({ cb, once });
+  }
+
+  once(event, cb) { this._add(event, cb, true); return this; }
+
+  on(event, cb) { this._add(event, cb, false); return this; }
+
+  removeListener(event, cb) {
+    const set = this._listeners.get(event);
+    if (set) for (const l of [...set]) if (l.cb === cb) set.delete(l);
+  }
+
+  _emit(event, ...args) {
+    const set = this._listeners.get(event);
+    if (!set) return;
+    for (const l of [...set]) { if (l.once) set.delete(l); try { l.cb(...args); } catch { /* ignore */ } }
+  }
+
+  // 上游传字符串代码（IIFE / 对象字面量），puppeteer page.evaluate(string) 按表达式求值并 returnByValue。
+  async executeJavaScript(code) {
+    const page = await this._pagePromise;
+    return page.evaluate(code);
+  }
+
+  stop() {
+    this._pagePromise.then((p) => p.evaluate('window.stop && window.stop()').catch(() => {})).catch(() => {});
+  }
+}
+
 class BrowserWindow {
-  constructor() {
-    throw new Error('WEB_NO_BROWSER_WINDOW: 图表离屏渲染在 Web 版暂不可用');
+  constructor(opts = {}) {
+    this._destroyed = false;
+    this.webContents = new FakeWebContents({ width: opts.width, height: opts.height });
   }
-  static getAllWindows() {
-    return [];
+
+  setMenuBarVisibility() { /* no-op */ }
+
+  isDestroyed() { return this._destroyed; }
+
+  async loadURL(url) {
+    const wc = this.webContents;
+    try {
+      const page = await wc._pagePromise;
+      await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+      wc._emit('did-finish-load');
+    } catch (err) {
+      wc._emit('did-fail-load', {}, -1, (err && err.message) || String(err));
+      throw err;
+    }
   }
-  static getFocusedWindow() {
-    return null;
+
+  destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
+    this.webContents._pagePromise.then((p) => p.close().catch(() => {})).catch(() => {});
   }
+
+  close() { this.destroy(); }
+
+  static getAllWindows() { return []; }
+
+  static getFocusedWindow() { return null; }
 }
 
 // ---- app：全局单例（供直接 require('electron').app 的少数模块用，如 localImageRenderService 兜底、
